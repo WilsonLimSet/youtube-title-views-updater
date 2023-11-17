@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
         requestBody: {
           id: "PA2GKru3GT8", // Your video ID here
           snippet: {
-            title: `This video has ${stats.viewCount} views and ${stats.dislikeCount} dislikes.`,
+            title: `This video has ${stats.viewCount} views and ${stats.dislikeCount} dislikes`,
             categoryId: '28', // Make sure this category ID is correct
           },
         },
