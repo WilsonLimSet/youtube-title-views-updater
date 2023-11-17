@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
 
   try {
     const result = await youtube.videos.list({
-      id: "vV4g1nNbBNg", // Your video ID here
+      id: "PA2GKru3GT8", // Your video ID here
       part: "statistics,snippet",
     });
 
@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
       await youtube.videos.update({
         part: "snippet",
         requestBody: {
-          id: "vV4g1nNbBNg", // Your video ID here
+          id: "PA2GKru3GT8", // Your video ID here
           snippet: {
             title: `This video has ${stats.viewCount} views and ${stats.dislikeCount} dislikes.`,
             categoryId: '28', // Make sure this category ID is correct
