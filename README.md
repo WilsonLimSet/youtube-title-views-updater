@@ -1,5 +1,5 @@
 ## youtube-title-views-updater
-
+<img width="952" alt="youtube" src="https://github.com/WilsonLimSet/youtube-title-views-updater/assets/78862507/c6815f70-70ce-4ec8-81ae-5587a1c10313">
 How to achieve the same functionality for free:
 
 1. Follow - https://www.ryancarmody.dev/blog/create-oauth-tokens-in-google-cloud-for-youtube-data-api
@@ -9,3 +9,4 @@ How to achieve the same functionality for free:
 5. Deploy to vercel
 6. Create a CronJob on - https://cron-job.org/, the url is your https://yourvercel.app/api/updatetitile
 7. Enjoy
+
