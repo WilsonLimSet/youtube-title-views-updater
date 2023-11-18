@@ -31,6 +31,7 @@ module.exports = async (req, res) => {
           id: "PA2GKru3GT8", // Your video ID here
           snippet: {
             title: `This video has ${stats.viewCount} views and ${stats.dislikeCount} dislikes`,
+            description: 'updates every 10 minutes so won’t be 100% accurate,  thanks to all the tutorials/guides,  github - https://github.com/WilsonLimSet/youtube-title-views-updater, music - https://www.youtube.com/watch?v=b1W4DJd3pCo',
             categoryId: '28', // Make sure this category ID is correct
           },
         },
