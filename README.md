@@ -11,3 +11,4 @@ How to achieve the same functionality for free:
 6. Create a CronJob on - https://cron-job.org/, the url is your https://yourvercel.app/api/updatetitile
 7. Enjoy
 
+Note: Refresh token expires after a week
