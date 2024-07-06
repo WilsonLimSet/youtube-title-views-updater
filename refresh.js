@@ -9,7 +9,7 @@ const oauth2Client = new google.auth.OAuth2(
 
 const getTokens = async () => {
   const res = await oauth2Client.getToken(
-    "4/0AfJohXm2zbnozOSFcLrxg6eYsLqTKwYxAtY0BenDLMP5PNFvdEC081wATbVbmOQ0gpWwww"
+    "4/0ATx3LY7zONaXdrHoHtAFMI_3skHhn342Qh8d7eO1hEPnUwaX9Aa76v-YipIN1i6FObWe0Q"
   );
   console.log(res.tokens);
 };
