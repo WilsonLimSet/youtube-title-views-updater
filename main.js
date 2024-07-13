@@ -4,6 +4,7 @@ const http = require("http");
 const url = require("url");
 const fs = require("fs");
 const path = require("path");
+const axios = require("axios");
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
@@ -12,6 +13,8 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 const TOKEN_PATH = path.join(__dirname, "tokens.json");
+const vercelToken = process.env.VERCEL_API_TOKEN;
+const projectId = "prj_shRDnGbGwF61KAes9phHPcbU5IDs";
 
 const generateAuthUrl = async () => {
   const scopes = ["https://www.googleapis.com/auth/youtube"];
@@ -32,6 +35,9 @@ const getTokens = async (code) => {
     // Save the tokens to a file
     fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
     console.log("Tokens saved to", TOKEN_PATH);
+
+    // Update Vercel environment variable
+    await updateVercelEnvVariable(tokens.refresh_token);
   } catch (error) {
     console.error("Error retrieving tokens:", error);
   }
@@ -66,19 +72,105 @@ const refreshAccessToken = async () => {
     if (!tokens.refresh_token) {
       throw new Error("No refresh token found in stored tokens.");
     }
-    oauth2Client.setCredentials(tokens);
 
-    const newTokens = await oauth2Client.refreshAccessToken();
-    console.log("New tokens:", newTokens.credentials);
+    // Check if the access token has expired
+    const currentTime = Date.now();
+    if (currentTime >= tokens.expiry_date) {
+      console.log("Access token has expired. Refreshing...");
+      oauth2Client.setCredentials(tokens);
 
-    // Update the tokens file with the new tokens
-    fs.writeFileSync(TOKEN_PATH, JSON.stringify(newTokens.credentials));
-    console.log("Tokens updated in", TOKEN_PATH);
+      const newTokens = await oauth2Client.refreshAccessToken();
+      console.log("New tokens:", newTokens.credentials);
+
+      // Update the tokens file with the new tokens
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(newTokens.credentials));
+      console.log("Tokens updated in", TOKEN_PATH);
+
+      // Update Vercel environment variable
+      await updateVercelEnvVariable(newTokens.credentials.refresh_token);
+    } else {
+      console.log("Access token is still valid. No need to refresh.");
+      // You might want to update the Vercel environment variable here as well,
+      // in case it wasn't updated in a previous run
+      await updateVercelEnvVariable(tokens.refresh_token);
+    }
   } catch (error) {
     console.error("Error refreshing access token:", error);
   }
 };
+async function updateVercelEnvVariable(refreshToken) {
+  const deploymentId = "8aobsBDDVo4nBuX9TSnY6oGn7WgV";
+  const projectName = "youtube-views-title-update";
 
+  try {
+    // First, get the existing environment variables
+    const getEnvResponse = await axios({
+      method: "get",
+      url: `https://api.vercel.com/v9/projects/${projectId}/env`,
+      headers: {
+        Authorization: `Bearer ${vercelToken}`,
+      },
+    });
+
+    // Find the REFRESH_TOKEN environment variable
+    const refreshTokenEnv = getEnvResponse.data.envs.find(
+      (env) => env.key === "REFRESH_TOKEN"
+    );
+
+    if (!refreshTokenEnv) {
+      throw new Error("REFRESH_TOKEN environment variable not found");
+    }
+
+    // Check if the new refresh token is different from the current one
+    if (refreshTokenEnv.value !== refreshToken) {
+      // Update the existing environment variable
+      const updateResponse = await axios({
+        method: "patch",
+        url: `https://api.vercel.com/v9/projects/${projectId}/env/${refreshTokenEnv.id}`,
+        headers: {
+          Authorization: `Bearer ${vercelToken}`,
+          "Content-Type": "application/json",
+        },
+        data: {
+          value: refreshToken,
+        },
+      });
+
+      console.log(
+        "Vercel environment variable updated successfully:",
+        updateResponse.data
+      );
+
+      // Redeploy the specified deployment
+      const redeployResponse = await axios({
+        method: "post",
+        url: `https://api.vercel.com/v13/deployments`,
+        headers: {
+          Authorization: `Bearer ${vercelToken}`,
+          "Content-Type": "application/json",
+        },
+        data: {
+          name: projectName,
+          deploymentId: deploymentId,
+        },
+      });
+
+      console.log(
+        "Redeployment triggered successfully:",
+        redeployResponse.data
+      );
+    } else {
+      console.log("Refresh token unchanged. Skipping redeployment.");
+    }
+  } catch (error) {
+    console.error(
+      "Error in Vercel operations:",
+      error.response ? error.response.data : error.message
+    );
+  }
+}
+
+// Main execution
 if (fs.existsSync(TOKEN_PATH)) {
   refreshAccessToken();
 } else {
