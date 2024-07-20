@@ -19,12 +19,14 @@ const projectId = "prj_shRDnGbGwF61KAes9phHPcbU5IDs";
 const generateAuthUrl = async () => {
   const scopes = ["https://www.googleapis.com/auth/youtube"];
 
-  const authUrl = await oauth2Client.generateAuthUrl({
+  const authUrl = oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: scopes,
+    prompt: "consent", // This forces a new refresh token to be generated
   });
 
   console.log("Visit this URL to authorize the application:", authUrl);
+  return authUrl;
 };
 
 const getTokens = async (code) => {
@@ -73,12 +75,9 @@ const refreshAccessToken = async () => {
       throw new Error("No refresh token found in stored tokens.");
     }
 
-    // Check if the access token has expired
-    const currentTime = Date.now();
-    if (currentTime >= tokens.expiry_date) {
-      console.log("Access token has expired. Refreshing...");
-      oauth2Client.setCredentials(tokens);
+    oauth2Client.setCredentials(tokens);
 
+    try {
       const newTokens = await oauth2Client.refreshAccessToken();
       console.log("New tokens:", newTokens.credentials);
 
@@ -88,18 +87,37 @@ const refreshAccessToken = async () => {
 
       // Update Vercel environment variable
       await updateVercelEnvVariable(newTokens.credentials.refresh_token);
-    } else {
-      console.log("Access token is still valid. No need to refresh.");
-      // You might want to update the Vercel environment variable here as well,
-      // in case it wasn't updated in a previous run
-      await updateVercelEnvVariable(tokens.refresh_token);
+    } catch (refreshError) {
+      if (refreshError.message.includes("invalid_grant")) {
+        console.log(
+          "Refresh token is invalid or expired. Restarting authentication process."
+        );
+        await restartAuthProcess();
+      } else {
+        throw refreshError;
+      }
     }
   } catch (error) {
     console.error("Error refreshing access token:", error);
   }
 };
+
+const restartAuthProcess = async () => {
+  console.log("Restarting authentication process...");
+
+  // Delete the existing tokens file
+  if (fs.existsSync(TOKEN_PATH)) {
+    fs.unlinkSync(TOKEN_PATH);
+  }
+
+  // Generate a new auth URL
+  await generateAuthUrl();
+
+  // Start the server to handle the callback
+  startServer();
+};
+
 async function updateVercelEnvVariable(refreshToken) {
-  const deploymentId = "8aobsBDDVo4nBuX9TSnY6oGn7WgV";
   const projectName = "youtube-views-title-update";
 
   try {
@@ -141,8 +159,19 @@ async function updateVercelEnvVariable(refreshToken) {
         updateResponse.data
       );
 
-      // Redeploy the specified deployment
-      const redeployResponse = await axios({
+      // Fetch project details to get the repoId
+      const projectResponse = await axios({
+        method: "get",
+        url: `https://api.vercel.com/v9/projects/${projectId}`,
+        headers: {
+          Authorization: `Bearer ${vercelToken}`,
+        },
+      });
+
+      const repoId = projectResponse.data.link.repoId;
+
+      // Create a new deployment
+      const createDeploymentResponse = await axios({
         method: "post",
         url: `https://api.vercel.com/v13/deployments`,
         headers: {
@@ -151,16 +180,23 @@ async function updateVercelEnvVariable(refreshToken) {
         },
         data: {
           name: projectName,
-          deploymentId: deploymentId,
+          project: projectId,
+          target: "production",
+          gitSource: {
+            type: "github",
+            repo: "wilsonlimset/youtube-views-title-updater", // Replace with your actual GitHub repo
+            ref: "main", // Or whichever branch you want to deploy
+            repoId: repoId,
+          },
         },
       });
 
       console.log(
-        "Redeployment triggered successfully:",
-        redeployResponse.data
+        "New deployment created successfully:",
+        createDeploymentResponse.data
       );
     } else {
-      console.log("Refresh token unchanged. Skipping redeployment.");
+      console.log("Refresh token unchanged. Skipping update and deployment.");
     }
   } catch (error) {
     console.error(
@@ -170,10 +206,31 @@ async function updateVercelEnvVariable(refreshToken) {
   }
 }
 
+const checkTokens = () => {
+  try {
+    const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH));
+    console.log("Access Token:", tokens.access_token.substring(0, 10) + "...");
+    console.log(
+      "Refresh Token:",
+      tokens.refresh_token.substring(0, 10) + "..."
+    );
+    console.log("Expiry Date:", new Date(tokens.expiry_date).toLocaleString());
+
+    // Set the credentials
+    oauth2Client.setCredentials(tokens);
+
+    console.log("Tokens loaded and set successfully");
+  } catch (error) {
+    console.error("Error checking tokens:", error);
+  }
+};
+
 // Main execution
-if (fs.existsSync(TOKEN_PATH)) {
-  refreshAccessToken();
-} else {
-  generateAuthUrl();
-  startServer();
-}
+(async () => {
+  if (fs.existsSync(TOKEN_PATH)) {
+    checkTokens();
+    await refreshAccessToken();
+  } else {
+    await restartAuthProcess();
+  }
+})();
