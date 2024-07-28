@@ -195,6 +195,11 @@ async function updateVercelEnvVariable(refreshToken) {
         "New deployment created successfully:",
         createDeploymentResponse.data
       );
+      // Wait for 30 seconds to ensure deployment is complete
+      await new Promise((resolve) => setTimeout(resolve, 30000));
+
+      // Enable the cron job
+      await enableCronJob();
     } else {
       console.log("Refresh token unchanged. Skipping update and deployment.");
     }
@@ -225,6 +230,39 @@ const checkTokens = () => {
   }
 };
 
+async function enableCronJob() {
+  const API_KEY = process.env.CRON_JOB_API_KEY;
+  const JOB_ID = "your_actual_job_id_here"; // Replace with your actual job ID
+  const ENDPOINT = `https://api.cron-job.org/jobs/${JOB_ID}`;
+
+  const headers = {
+    Authorization: `Bearer ${API_KEY}`,
+    "Content-Type": "application/json",
+  };
+
+  const payload = {
+    job: {
+      enabled: true,
+    },
+  };
+
+  try {
+    const response = await axios.patch(ENDPOINT, payload, { headers });
+
+    if (response.status === 200) {
+      console.log(`Job ${JOB_ID} enabled successfully!`);
+    } else {
+      console.log(`Failed to enable job. Status code: ${response.status}`);
+      console.log(`Response: ${response.data}`);
+    }
+  } catch (error) {
+    console.error(
+      "Error enabling cron job:",
+      error.response ? error.response.data : error.message
+    );
+  }
+}
+
 // Main execution
 (async () => {
   if (fs.existsSync(TOKEN_PATH)) {
@@ -232,5 +270,7 @@ const checkTokens = () => {
     await refreshAccessToken();
   } else {
     await restartAuthProcess();
+    // Wait for 30 seconds after deployment before enabling the cron job
+    setTimeout(enableCronJob, 30000);
   }
 })();
