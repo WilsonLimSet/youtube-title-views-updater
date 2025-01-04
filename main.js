@@ -232,7 +232,7 @@ const checkTokens = () => {
 
 async function enableCronJob() {
   const API_KEY = process.env.CRON_JOB_API_KEY;
-  const JOB_ID = "your_actual_job_id_here"; // Replace with your actual job ID
+  const JOB_ID = "4696589"; // Replace with your actual job ID
   const ENDPOINT = `https://api.cron-job.org/jobs/${JOB_ID}`;
 
   const headers = {
